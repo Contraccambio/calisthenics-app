@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Cali Log" />
+  <title>Calisthenics Log</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app"></div>
+  <aside id="cronometro" class="crono hidden" aria-live="polite">
+    <div class="crono-head">
+      <div class="tiny" id="cronoMode">Cronometro</div>
+      <div class="crono-sub" id="cronoSub"></div>
+    </div>
+    <div class="crono-digits" id="cronoDigits">00:00</div>
+    <div class="crono-track hidden" id="cronoTrack"><div id="cronoBar"></div></div>
+    <div class="crono-actions">
+      <button class="btn btn-primary grow" id="cronoStart">Avvia</button>
+      <button class="btn btn-ghost grow" id="cronoPause">Pausa</button>
+      <button class="btn btn-ghost grow" id="cronoReset">Reset</button>
+    </div>
+  </aside>
+  <div id="saveDot" class="save-dot hidden">Salvato</div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

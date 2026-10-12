@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Calisthenics Log</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const state = { ready: false, error: "", stats: null };
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Errore");
+      return data;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function formatWhen(iso) {
+      if (!iso) return "—";
+      return iso.replace("T", " ").replace("Z", " UTC");
+    }
+
+    async function login() {
+      const password = document.getElementById("adminPassword").value;
+      state.error = "";
+      render();
+      try {
+        await api("/api/admin/login", { method: "POST", body: JSON.stringify({ password }) });
+        await loadStats();
+      } catch (err) {
+        state.error = err.message;
+        render();
+      }
+    }
+
+    async function logout() {
+      await api("/api/admin/logout", { method: "POST", body: "{}" }).catch(() => {});
+      state.ready = false;
+      state.stats = null;
+      render();
+    }
+
+    async function loadStats() {
+      const stats = await api("/api/admin/stats");
+      state.stats = stats;
+      state.ready = true;
+      state.error = "";
+      render();
+    }
+
+    function render() {
+      const root = document.getElementById("app");
+      if (!state.ready) {
+        root.innerHTML = `
+          <section class="hero">
+            <div class="kicker">Monitoraggio</div>
+            <h1>Area admin</h1>
+            <p>Quanti atleti usano l’app, chi sono, ultima attività e note salvate.</p>
+          </section>
+          <div class="card">
+            <label for="adminPassword">Password admin</label>
+            <input id="adminPassword" type="password" autocomplete="current-password" placeholder="ADMIN_PASSWORD" />
+            ${state.error ? `<p class="error">${escapeHtml(state.error)}</p>` : ""}
+            <div class="row" style="margin-top:12px">
+              <button class="btn btn-primary btn-block" id="adminLoginBtn">Entra</button>
+            </div>
+          </div>
+          <p class="muted" style="margin-top:16px"><a href="/" style="color:inherit">← Torna all’app</a></p>
+        `;
+        document.getElementById("adminLoginBtn").onclick = login;
+        document.getElementById("adminPassword").onkeydown = (e) => { if (e.key === "Enter") login(); };
+        return;
+      }
+      const s = state.stats;
+      root.innerHTML = `
+        <div class="topbar">
+          <a class="chip" href="/">← App</a>
+          <button class="chip chip-exit" id="adminLogoutBtn">Esci</button>
+        </div>
+        <section class="hero">
+          <div class="kicker">Utilizzo</div>
+          <h1>Dashboard</h1>
+          <p>${s.userCount} atleti · ${s.noteCount} note · ${s.sessionCount} sessioni completate</p>
+        </section>
+        <div class="stack">
+          <div class="card"><b>${s.userCount}</b><div class="muted">Utenti registrati</div></div>
+          ${s.users.length ? s.users.map((u) => `
+            <div class="card">
+              <div class="ex-name">${escapeHtml(u.name)}</div>
+              <div class="muted">Iscritto: ${escapeHtml(formatWhen(u.createdAt))}</div>
+              <div class="muted">Ultima attività: ${escapeHtml(formatWhen(u.lastSeen))}</div>
+              <div class="muted">${u.noteCount} note · ${u.sessionCount} sessioni</div>
+            </div>
+          `).join("") : `<div class="empty">Nessun utente ancora.</div>`}
+        </div>
+      `;
+      document.getElementById("adminLogoutBtn").onclick = logout;
+    }
+
+    loadStats().catch(() => {
+      state.ready = false;
+      render();
+    });
+  </script>
+</body>
+</html>
