@@ -361,45 +361,8 @@ class Handler(SimpleHTTPRequestHandler):
         return self.send_error_json("Non trovato.", 404)
 
     def handle_register(self, body: dict) -> None:
-        name = (body.get("name") or "").strip()
-        password = body.get("password") or ""
-        confirm = body.get("confirm") if body.get("confirm") is not None else password
-        if not name:
-            return self.send_error_json("Inserisci il nome.")
-        if len(password) < 4:
-            return self.send_error_json("La password deve avere almeno 4 caratteri.")
-        if password != confirm:
-            return self.send_error_json("Le password non coincidono.")
-        digest, salt = hash_password(password)
-        user_id = str(uuid.uuid4())
-        token = secrets.token_hex(24)
-        created = now_iso()
-        with db_lock:
-            exists = db().execute(
-                "SELECT id FROM users WHERE lower(name) = lower(?)", (name,)
-            ).fetchone()
-            if exists:
-                return self.send_error_json("Esiste già un profilo con questo nome.")
-            count = db().execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"]
-            color = COLORS[count % len(COLORS)]
-            db().execute(
-                """
-                INSERT INTO users (id, name, password_hash, password_salt, color, created_at, last_seen)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (user_id, name, digest, salt, color, created, created),
-            )
-            db().execute(
-                "INSERT INTO auth_sessions (token, user_id, is_admin, created_at) VALUES (?, ?, 0, ?)",
-                (token, user_id, created),
-            )
-            db().commit()
-            row = db().execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        self.send_json(
-            {"user": user_public(row)},
-            201,
-            set_cookies=[self.session_cookie(COOKIE_USER, token)],
-        )
+        del body
+        self.send_error_json("La registrazione è chiusa.", 403)
 
     def handle_login(self, body: dict) -> None:
         name = (body.get("name") or "").strip()

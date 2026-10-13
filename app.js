@@ -11,7 +11,6 @@ const state = {
   week: "w12",
   date: todayISO(),
   authError: "",
-  authMode: "login",
   busy: false,
 };
 
@@ -187,30 +186,6 @@ async function completeSession() {
   }
 }
 
-async function registerUser() {
-  const name = document.getElementById("newUser")?.value.trim() || "";
-  const password = document.getElementById("newPassword")?.value || "";
-  const confirm = document.getElementById("newPasswordConfirm")?.value || "";
-  if (!name) return setAuthError("Inserisci il nome.");
-  if (password.length < 4) return setAuthError("La password deve avere almeno 4 caratteri.");
-  if (password !== confirm) return setAuthError("Le password non coincidono.");
-  state.busy = true;
-  state.authError = "";
-  render();
-  try {
-    const data = await api("/api/register", {
-      method: "POST",
-      body: JSON.stringify({ name, password, confirm }),
-    });
-    await loadNotes();
-    enterApp(data.user);
-  } catch (err) {
-    setAuthError(err.message);
-  } finally {
-    state.busy = false;
-  }
-}
-
 async function submitLogin() {
   const name = document.getElementById("loginName")?.value.trim() || "";
   const password = document.getElementById("loginPassword")?.value || "";
@@ -242,7 +217,6 @@ async function logout() {
   state.notes = [];
   state.historySessions = [];
   state.view = "gate";
-  state.authMode = "login";
   state.authError = "";
   render();
 }
@@ -490,37 +464,26 @@ function render() {
 }
 
 function renderGate() {
-  const login = state.authMode === "login";
   return `
     <section class="hero">
       <div class="kicker">Scheda 6 settimane</div>
       <h1>Calisthenics Log</h1>
-      <p>Tre giorni di allenamento. Registrati con password: le note restano sul server, sul tuo profilo.</p>
+      <p>Tre giorni di allenamento. Entra con nome e password: le note restano sul server, sul tuo profilo.</p>
     </section>
     <div class="stack">
       <div class="segment">
-        <button class="seg ${login ? "active" : ""}" id="showLogin">Entra</button>
-        <button class="seg ${!login ? "active" : ""}" id="showRegister">Registrati</button>
+        <button class="seg active" id="showLogin">Entra</button>
         <a class="seg" href="/admin" style="text-decoration:none;text-align:center"><b>Admin</b><span>utilizzo</span></a>
       </div>
       <div class="card">
-        ${login ? `
-          <label for="loginName">Nome</label>
-          <input id="loginName" autocomplete="username" placeholder="Nome e cognome" />
-          <label for="loginPassword">Password</label>
-          <input id="loginPassword" type="password" autocomplete="current-password" />
-        ` : `
-          <label for="newUser">Nome</label>
-          <input id="newUser" autocomplete="username" placeholder="Nome e cognome" />
-          <label for="newPassword">Password</label>
-          <input id="newPassword" type="password" autocomplete="new-password" placeholder="Almeno 4 caratteri" />
-          <label for="newPasswordConfirm">Conferma password</label>
-          <input id="newPasswordConfirm" type="password" autocomplete="new-password" />
-        `}
+        <label for="loginName">Nome</label>
+        <input id="loginName" autocomplete="username" placeholder="Nome e cognome" />
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" />
         ${state.authError ? `<p class="error">${escapeHtml(state.authError)}</p>` : ""}
         <div class="row" style="margin-top:12px">
-          <button class="btn btn-primary btn-block" id="${login ? "loginBtn" : "registerBtn"}" ${state.busy ? "disabled" : ""}>
-            ${state.busy ? "Attendi…" : login ? "Entra" : "Registrati"}
+          <button class="btn btn-primary btn-block" id="loginBtn" ${state.busy ? "disabled" : ""}>
+            ${state.busy ? "Attendi…" : "Entra"}
           </button>
         </div>
       </div>
@@ -647,23 +610,7 @@ function renderHistory() {
 }
 
 function bindEvents() {
-  document.getElementById("showLogin")?.addEventListener("click", () => {
-    state.authMode = "login";
-    state.authError = "";
-    render();
-  });
-  document.getElementById("showRegister")?.addEventListener("click", () => {
-    state.authMode = "register";
-    state.authError = "";
-    render();
-  });
-  document.getElementById("registerBtn")?.addEventListener("click", () => registerUser());
   document.getElementById("loginBtn")?.addEventListener("click", () => submitLogin());
-  ["newUser", "newPassword", "newPasswordConfirm"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") registerUser();
-    });
-  });
   ["loginName", "loginPassword"].forEach((id) => {
     document.getElementById(id)?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") submitLogin();
