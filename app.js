@@ -3,15 +3,12 @@ import { ROUTINE, WEEKS, findExercise } from "./data.js";
 const PREFS_KEY = "calisthenics-prefs";
 
 const state = {
-  view: "gate",
-  user: null,
+  view: "workout",
   notes: [],
   historySessions: [],
   day: 1,
   week: "w12",
   date: todayISO(),
-  authError: "",
-  busy: false,
 };
 
 const crono = {
@@ -39,10 +36,6 @@ function formatDate(iso) {
   return `${d}/${m}/${y}`;
 }
 
-function initials(name) {
-  return (name || "").trim().split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "?";
-}
-
 function persistPrefs() {
   localStorage.setItem(PREFS_KEY, JSON.stringify({ day: state.day, week: state.week }));
 }
@@ -66,16 +59,6 @@ async function api(path, options = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Errore di rete");
   return data;
-}
-
-function enterApp(user) {
-  state.user = user;
-  state.view = "workout";
-  state.authError = "";
-  state.date = todayISO();
-  restorePrefs();
-  persistPrefs();
-  render();
 }
 
 async function loadNotes() {
@@ -184,47 +167,6 @@ async function completeSession() {
   } catch (err) {
     flashSaved(err.message);
   }
-}
-
-async function submitLogin() {
-  const name = document.getElementById("loginName")?.value.trim() || "";
-  const password = document.getElementById("loginPassword")?.value || "";
-  if (!name || !password) return setAuthError("Nome e password sono obbligatori.");
-  state.busy = true;
-  state.authError = "";
-  render();
-  try {
-    const data = await api("/api/login", {
-      method: "POST",
-      body: JSON.stringify({ name, password }),
-    });
-    await loadNotes();
-    enterApp(data.user);
-  } catch (err) {
-    setAuthError(err.message);
-  } finally {
-    state.busy = false;
-  }
-}
-
-async function logout() {
-  if (state.user && !confirm("Uscire dall'app? Le note sono già salvate.")) return;
-  await flushPendingNotes();
-  crono.mode = "stopwatch";
-  resetCrono();
-  await api("/api/logout", { method: "POST", body: "{}" }).catch(() => {});
-  state.user = null;
-  state.notes = [];
-  state.historySessions = [];
-  state.view = "gate";
-  state.authError = "";
-  render();
-}
-
-function setAuthError(message) {
-  state.authError = message;
-  state.busy = false;
-  render();
 }
 
 function flashSaved(text = "Salvato") {
@@ -359,7 +301,7 @@ function paintCrono() {
 
 function syncCronoDock() {
   const root = document.getElementById("cronometro");
-  const show = Boolean(state.user) && state.view !== "gate";
+  const show = true;
   root?.classList.toggle("hidden", !show);
   document.body.classList.toggle("crono-open", show);
   if (show) paintCrono();
@@ -456,55 +398,19 @@ function groupNotes() {
 
 function render() {
   const root = document.getElementById("app");
-  if (state.view === "gate") root.innerHTML = renderGate();
-  else if (state.view === "history") root.innerHTML = renderHistory();
+  if (state.view === "history") root.innerHTML = renderHistory();
   else root.innerHTML = renderWorkout();
   bindEvents();
   syncCronoDock();
 }
 
-function renderGate() {
-  return `
-    <section class="hero">
-      <div class="kicker">Scheda 6 settimane</div>
-      <h1>Calisthenics Log</h1>
-      <p>Tre giorni di allenamento. Entra con nome e password: le note restano sul server, sul tuo profilo.</p>
-    </section>
-    <div class="stack">
-      <div class="card">
-        <label for="loginName">Nome</label>
-        <input id="loginName" autocomplete="username" placeholder="Nome e cognome" />
-        <label for="loginPassword">Password</label>
-        <input id="loginPassword" type="password" autocomplete="current-password" />
-        ${state.authError ? `<p class="error">${escapeHtml(state.authError)}</p>` : ""}
-        <div class="row" style="margin-top:12px">
-          <button class="btn btn-primary btn-block" id="loginBtn" ${state.busy ? "disabled" : ""}>
-            ${state.busy ? "Attendi…" : "Entra"}
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function renderWorkout() {
-  const user = state.user;
-  if (!user) {
-    state.view = "gate";
-    return renderGate();
-  }
   const day = ROUTINE[state.day];
   const { done, total } = progress();
   return `
     <div class="topbar">
-      <span class="chip">
-        <span class="avatar" style="width:28px;height:28px;border-radius:8px;background:${user.color};font-size:11px">${escapeHtml(initials(user.name))}</span>
-        ${escapeHtml(user.name)}
-      </span>
-      <div class="row">
-        <button class="chip" id="historyBtn">Storico</button>
-        <button class="chip chip-exit" id="logoutBtn">Esci</button>
-      </div>
+      <span class="chip">Scheda</span>
+      <button class="chip" id="historyBtn">Storico</button>
     </div>
     <section class="hero">
       <div class="kicker">Giorno ${state.day} · ${weekLabel(state.week)}</div>
@@ -576,17 +482,15 @@ function renderExercise(ex) {
 }
 
 function renderHistory() {
-  const user = state.user;
   const sessions = state.historySessions;
   return `
     <div class="topbar">
       <button class="chip" id="backWorkoutBtn">← Allenamento</button>
-      <button class="chip chip-exit" id="logoutBtn">Esci</button>
     </div>
     <section class="hero">
       <div class="kicker">Archivio</div>
       <h1>Storico sessioni</h1>
-      <p>${sessions.length} allenamenti salvati per ${escapeHtml(user?.name || "")}.</p>
+      <p>${sessions.length} allenamenti salvati.</p>
     </section>
     ${sessions.length ? `
       <div class="stack">
@@ -606,13 +510,6 @@ function renderHistory() {
 }
 
 function bindEvents() {
-  document.getElementById("loginBtn")?.addEventListener("click", () => submitLogin());
-  ["loginName", "loginPassword"].forEach((id) => {
-    document.getElementById(id)?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submitLogin();
-    });
-  });
-  document.getElementById("logoutBtn")?.addEventListener("click", logout);
   document.getElementById("historyBtn")?.addEventListener("click", async () => {
     try {
       await loadHistory();
@@ -687,10 +584,4 @@ document.getElementById("cronoReset")?.addEventListener("click", resetCrono);
 
 restorePrefs();
 render();
-
-api("/api/me")
-  .then(async (data) => {
-    await loadNotes();
-    enterApp(data.user);
-  })
-  .catch(() => {});
+loadNotes().then(() => render()).catch((err) => flashSaved(err.message || "Note non caricate"));

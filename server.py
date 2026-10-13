@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""Calisthenics Log backend: SQLite + session cookies. Stdlib only."""
+"""Calisthenics Log backend: one shared SQLite log. Stdlib only."""
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import os
-import secrets
 import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
-from http.cookies import SimpleCookie
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
@@ -30,8 +26,7 @@ STATIC_OK = {
 }
 
 COLORS = ["#e8ff47", "#7dffc2", "#7ec8ff", "#ffb347", "#ff8fab", "#c4b5fd"]
-PBKDF2_ROUNDS = 200_000
-COOKIE_USER = "cali_session"
+SHARED_USER_ID = "shared-log"
 
 db_lock = threading.Lock()
 
@@ -132,21 +127,6 @@ def db() -> sqlite3.Connection:
     return CONN
 
 
-def hash_password(password: str) -> tuple[str, str]:
-    salt = secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ROUNDS
-    ).hex()
-    return digest, salt
-
-
-def verify_password(password: str, digest: str, salt: str) -> bool:
-    check = hashlib.pbkdf2_hmac(
-        "sha256", password.encode("utf-8"), salt.encode("utf-8"), PBKDF2_ROUNDS
-    ).hex()
-    return hmac.compare_digest(check, digest)
-
-
 def user_public(row: sqlite3.Row) -> dict:
     return {
         "id": row["id"],
@@ -211,13 +191,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
-    def cookie(self, name: str) -> str:
-        raw = self.headers.get("Cookie", "")
-        jar = SimpleCookie()
-        jar.load(raw)
-        morsel = jar.get(name)
-        return morsel.value if morsel else ""
-
     def json_body(self) -> dict:
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0:
@@ -245,34 +218,21 @@ class Handler(SimpleHTTPRequestHandler):
     def send_error_json(self, message: str, status: int = 400) -> None:
         self.send_json({"error": message}, status)
 
-    def session_cookie(self, name: str, token: str, clear: bool = False) -> str:
-        proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip()
-        secure = proto == "https" or os.environ.get("FORCE_SECURE_COOKIES") == "1"
-        flags = "Path=/; HttpOnly; SameSite=Lax"
-        if secure:
-            flags += "; Secure"
-        if clear:
-            return f"{name}=; {flags}; Max-Age=0"
-        return f"{name}={token}; {flags}; Max-Age=2592000"
-
     def current_user(self):
-        token = self.cookie(COOKIE_USER)
-        if not token:
-            return None
         with db_lock:
-            row = db().execute(
-                """
-                SELECT users.* FROM auth_sessions
-                JOIN users ON users.id = auth_sessions.user_id
-                WHERE auth_sessions.token = ? AND auth_sessions.is_admin = 0
-                """,
-                (token,),
-            ).fetchone()
+            row = db().execute("SELECT * FROM users WHERE id = ?", (SHARED_USER_ID,)).fetchone()
             if row:
-                db().execute("UPDATE users SET last_seen = ? WHERE id = ?", (now_iso(), row["id"]))
-                db().commit()
-                row = db().execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone()
-        return row
+                return row
+            created = now_iso()
+            db().execute(
+                """
+                INSERT INTO users (id, name, password_hash, password_salt, color, created_at, last_seen)
+                VALUES (?, 'Scheda', '', '', ?, ?, ?)
+                """,
+                (SHARED_USER_ID, COLORS[0], created, created),
+            )
+            db().commit()
+            return db().execute("SELECT * FROM users WHERE id = ?", (SHARED_USER_ID,)).fetchone()
 
     def do_OPTIONS(self) -> None:
         self.send_response(204)
@@ -322,10 +282,6 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_write(self, method: str, path: str) -> None:
         body = self.json_body()
-        if method == "POST" and path == "/api/login":
-            return self.handle_login(body)
-        if method == "POST" and path == "/api/logout":
-            return self.handle_logout()
         if method == "POST" and path == "/api/sessions/complete":
             return self.handle_complete(body)
         if method == "PUT" and path == "/api/notes":
@@ -335,36 +291,6 @@ class Handler(SimpleHTTPRequestHandler):
         if method == "POST" and path == "/api/community/replies":
             return self.handle_community_reply(body)
         return self.send_error_json("Non trovato.", 404)
-
-    def handle_login(self, body: dict) -> None:
-        name = (body.get("name") or "").strip()
-        password = body.get("password") or ""
-        if not name or not password:
-            return self.send_error_json("Nome e password sono obbligatori.")
-        with db_lock:
-            row = db().execute(
-                "SELECT * FROM users WHERE lower(name) = lower(?)", (name,)
-            ).fetchone()
-        if not row or not verify_password(password, row["password_hash"], row["password_salt"]):
-            return self.send_error_json("Nome o password errati.", 401)
-        token = secrets.token_hex(24)
-        with db_lock:
-            db().execute(
-                "INSERT INTO auth_sessions (token, user_id, is_admin, created_at) VALUES (?, ?, 0, ?)",
-                (token, row["id"], now_iso()),
-            )
-            db().execute("UPDATE users SET last_seen = ? WHERE id = ?", (now_iso(), row["id"]))
-            db().commit()
-            row = db().execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone()
-        self.send_json({"user": user_public(row)}, set_cookies=[self.session_cookie(COOKIE_USER, token)])
-
-    def handle_logout(self) -> None:
-        token = self.cookie(COOKIE_USER)
-        if token:
-            with db_lock:
-                db().execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
-                db().commit()
-        self.send_json({"ok": True}, set_cookies=[self.session_cookie(COOKIE_USER, "", clear=True)])
 
     def handle_upsert_note(self, body: dict) -> None:
         user = self.current_user()

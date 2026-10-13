@@ -1,6 +1,6 @@
 # Calisthenics Log
 
-Scheda a 3 giorni con note per esercizio. Gli atleti entrano con nome e password. I dati stanno sul server (SQLite).
+Scheda a 3 giorni con note per esercizio. Il link apre direttamente la scheda. I dati stanno sul server (SQLite).
 
 ## Avvio
 
@@ -24,5 +24,4 @@ Se la porta 5000 è occupata (su macOS spesso da AirPlay Receiver), il server pa
 
 ## Cosa fa il backend
 
-- `POST /api/login` — password in hash PBKDF2, sessione in cookie
-- Note e sessioni per utente in SQLite (`data/app.db`)
+- Note e sessioni in SQLite (`data/app.db`), senza account
