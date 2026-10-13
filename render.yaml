@@ -6,6 +6,3 @@ services:
     region: frankfurt
     buildCommand: "python3 -c \"print('stdlib only')\""
     startCommand: python3 -u server.py
-    envVars:
-      - key: ADMIN_PASSWORD
-        generateValue: true

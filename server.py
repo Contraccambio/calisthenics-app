@@ -32,7 +32,6 @@ STATIC_OK = {
 COLORS = ["#e8ff47", "#7dffc2", "#7ec8ff", "#ffb347", "#ff8fab", "#c4b5fd"]
 PBKDF2_ROUNDS = 200_000
 COOKIE_USER = "cali_session"
-COOKIE_ADMIN = "cali_admin"
 
 db_lock = threading.Lock()
 
@@ -275,17 +274,6 @@ class Handler(SimpleHTTPRequestHandler):
                 row = db().execute("SELECT * FROM users WHERE id = ?", (row["id"],)).fetchone()
         return row
 
-    def admin_ok(self) -> bool:
-        token = self.cookie(COOKIE_ADMIN)
-        if not token:
-            return False
-        with db_lock:
-            row = db().execute(
-                "SELECT token FROM auth_sessions WHERE token = ? AND is_admin = 1",
-                (token,),
-            ).fetchone()
-        return bool(row)
-
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.end_headers()
@@ -295,8 +283,6 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/api/"):
             self.route_get(path)
             return
-        if path in ("/admin", "/admin/"):
-            self.path = "/admin.html"
         super().do_GET()
 
     def do_POST(self) -> None:
@@ -326,10 +312,6 @@ class Handler(SimpleHTTPRequestHandler):
             if not user:
                 return self.send_error_json("Non autenticato.", 401)
             return self.send_json(self.build_history(user["id"]))
-        if path == "/api/admin/stats":
-            if not self.admin_ok():
-                return self.send_error_json("Admin non autenticato.", 401)
-            return self.send_json(self.admin_stats())
         if path == "/api/health":
             return self.send_json({"ok": True})
         if path == "/api/community":
@@ -340,8 +322,6 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_write(self, method: str, path: str) -> None:
         body = self.json_body()
-        if method == "POST" and path == "/api/register":
-            return self.handle_register(body)
         if method == "POST" and path == "/api/login":
             return self.handle_login(body)
         if method == "POST" and path == "/api/logout":
@@ -350,19 +330,11 @@ class Handler(SimpleHTTPRequestHandler):
             return self.handle_complete(body)
         if method == "PUT" and path == "/api/notes":
             return self.handle_upsert_note(body)
-        if method == "POST" and path == "/api/admin/login":
-            return self.handle_admin_login(body)
-        if method == "POST" and path == "/api/admin/logout":
-            return self.handle_admin_logout()
         if method == "POST" and path == "/api/community":
             return self.handle_community_post(body)
         if method == "POST" and path == "/api/community/replies":
             return self.handle_community_reply(body)
         return self.send_error_json("Non trovato.", 404)
-
-    def handle_register(self, body: dict) -> None:
-        del body
-        self.send_error_json("La registrazione è chiusa.", 403)
 
     def handle_login(self, body: dict) -> None:
         name = (body.get("name") or "").strip()
@@ -488,28 +460,6 @@ class Handler(SimpleHTTPRequestHandler):
             db().commit()
         self.send_json({"ok": True})
 
-    def handle_admin_login(self, body: dict) -> None:
-        expected = os.environ.get("ADMIN_PASSWORD", "cali-admin")
-        password = body.get("password") or ""
-        if not password or not hmac.compare_digest(password, expected):
-            return self.send_error_json("Password admin errata.", 401)
-        token = secrets.token_hex(24)
-        with db_lock:
-            db().execute(
-                "INSERT INTO auth_sessions (token, user_id, is_admin, created_at) VALUES (?, NULL, 1, ?)",
-                (token, now_iso()),
-            )
-            db().commit()
-        self.send_json({"ok": True}, set_cookies=[self.session_cookie(COOKIE_ADMIN, token)])
-
-    def handle_admin_logout(self) -> None:
-        token = self.cookie(COOKIE_ADMIN)
-        if token:
-            with db_lock:
-                db().execute("DELETE FROM auth_sessions WHERE token = ?", (token,))
-                db().commit()
-        self.send_json({"ok": True}, set_cookies=[self.session_cookie(COOKIE_ADMIN, "", clear=True)])
-
     def build_history(self, user_id: str) -> dict:
         with db_lock:
             notes = db().execute(
@@ -531,33 +481,6 @@ class Handler(SimpleHTTPRequestHandler):
             grouped[key]["completedAt"] = s["completed_at"]
         items = sorted(grouped.values(), key=lambda x: (x["date"], x["day"]), reverse=True)
         return {"sessions": items}
-
-    def admin_stats(self) -> dict:
-        with db_lock:
-            users = db().execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
-            note_count = db().execute("SELECT COUNT(*) AS n FROM notes").fetchone()["n"]
-            session_count = db().execute("SELECT COUNT(*) AS n FROM workout_sessions").fetchone()["n"]
-            per_user_notes = {
-                r["user_id"]: r["n"]
-                for r in db().execute("SELECT user_id, COUNT(*) AS n FROM notes GROUP BY user_id")
-            }
-            per_user_sessions = {
-                r["user_id"]: r["n"]
-                for r in db().execute("SELECT user_id, COUNT(*) AS n FROM workout_sessions GROUP BY user_id")
-            }
-        return {
-            "userCount": len(users),
-            "noteCount": note_count,
-            "sessionCount": session_count,
-            "users": [
-                {
-                    **user_public(u),
-                    "noteCount": per_user_notes.get(u["id"], 0),
-                    "sessionCount": per_user_sessions.get(u["id"], 0),
-                }
-                for u in users
-            ],
-        }
 
     def handle_community_list(self) -> None:
         with db_lock:
@@ -730,7 +653,6 @@ def main() -> None:
     if port != preferred:
         print(f"PORT={preferred} non disponibile; avvio su {port}.", flush=True)
     print(f"Calisthenics Log → http://127.0.0.1:{port}", flush=True)
-    print(f"Admin            → http://127.0.0.1:{port}/admin", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

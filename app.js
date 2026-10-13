@@ -471,10 +471,6 @@ function renderGate() {
       <p>Tre giorni di allenamento. Entra con nome e password: le note restano sul server, sul tuo profilo.</p>
     </section>
     <div class="stack">
-      <div class="segment">
-        <button class="seg active" id="showLogin">Entra</button>
-        <a class="seg" href="/admin" style="text-decoration:none;text-align:center"><b>Admin</b><span>utilizzo</span></a>
-      </div>
       <div class="card">
         <label for="loginName">Nome</label>
         <input id="loginName" autocomplete="username" placeholder="Nome e cognome" />
