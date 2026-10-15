@@ -1,6 +1,7 @@
 import { ROUTINE, WEEKS, findExercise } from "./data.js";
 
 const PREFS_KEY = "calisthenics-prefs";
+const CRONO_KEY = "calisthenics-crono";
 
 const state = {
   view: "workout",
@@ -149,9 +150,19 @@ function saveNote(exerciseId, text) {
 
 function toggleDone(exerciseId) {
   const current = noteForToday(exerciseId);
-  setLocalNote(exerciseId, { done: !current?.done, day: state.day, week: state.week });
+  const done = !current?.done;
+  setLocalNote(exerciseId, { done, day: state.day, week: state.week });
   persistNote(exerciseId);
+  if (done) startTimerForExercise(exerciseId);
   render();
+}
+
+function startTimerForExercise(exerciseId) {
+  const ex = findExercise(exerciseId);
+  if (!ex) return;
+  const seconds = parseRestSeconds(ex.rest, ex.restSec);
+  if (seconds) startRestCountdown(seconds, `${ex.name} · ${ex.rest}`);
+  else startCronoFresh(ex.name);
 }
 
 async function completeSession() {
@@ -197,8 +208,31 @@ function parseRestSeconds(rest, fallback) {
 }
 
 function cronoElapsed() {
-  if (!crono.running) return crono.baseMs;
-  return crono.baseMs + (performance.now() - crono.startedAt);
+  if (!crono.running || !crono.startedAt) return crono.baseMs;
+  return crono.baseMs + (Date.now() - crono.startedAt);
+}
+
+function persistCrono() {
+  sessionStorage.setItem(CRONO_KEY, JSON.stringify({
+    mode: crono.mode,
+    running: crono.running,
+    baseMs: crono.baseMs,
+    startedAt: crono.startedAt,
+    restTotalMs: crono.restTotalMs,
+    label: crono.label,
+    finished: crono.finished,
+  }));
+}
+
+function restoreCrono() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(CRONO_KEY) || "null");
+    if (!saved) return;
+    Object.assign(crono, saved);
+    if (crono.running) ensureCronoTick();
+  } catch {
+    /* ignore */
+  }
 }
 
 function formatClock(ms) {
@@ -213,6 +247,19 @@ function ensureCronoTick() {
   crono.tick = setInterval(paintCrono, 200);
 }
 
+function startCronoFresh(label) {
+  crono.mode = "stopwatch";
+  crono.restTotalMs = 0;
+  crono.label = label || "";
+  crono.baseMs = 0;
+  crono.finished = false;
+  crono.running = true;
+  crono.startedAt = Date.now();
+  ensureCronoTick();
+  persistCrono();
+  paintCrono();
+}
+
 function startCrono() {
   if (crono.running) return;
   if (crono.mode === "rest" && (crono.finished || cronoElapsed() >= crono.restTotalMs)) {
@@ -220,8 +267,9 @@ function startCrono() {
     crono.finished = false;
   }
   crono.running = true;
-  crono.startedAt = performance.now();
+  crono.startedAt = Date.now();
   ensureCronoTick();
+  persistCrono();
   paintCrono();
 }
 
@@ -229,7 +277,9 @@ function pauseCrono() {
   if (crono.running) {
     crono.baseMs = cronoElapsed();
     crono.running = false;
+    crono.startedAt = 0;
   }
+  persistCrono();
   paintCrono();
 }
 
@@ -244,6 +294,7 @@ function resetCrono() {
     crono.restTotalMs = 0;
     crono.label = "";
   }
+  persistCrono();
   paintCrono();
 }
 
@@ -255,8 +306,9 @@ function startRestCountdown(seconds, label) {
   crono.baseMs = 0;
   crono.finished = false;
   crono.running = true;
-  crono.startedAt = performance.now();
+  crono.startedAt = Date.now();
   ensureCronoTick();
+  persistCrono();
   paintCrono();
 }
 
@@ -281,6 +333,8 @@ function paintCrono() {
       crono.finished = true;
       crono.running = false;
       crono.baseMs = crono.restTotalMs;
+      crono.startedAt = 0;
+      persistCrono();
       flashSaved("Recupero finito");
       if (navigator.vibrate) navigator.vibrate([200, 80, 200]);
     }
@@ -581,7 +635,11 @@ function escapeHtml(value) {
 document.getElementById("cronoStart")?.addEventListener("click", startCrono);
 document.getElementById("cronoPause")?.addEventListener("click", pauseCrono);
 document.getElementById("cronoReset")?.addEventListener("click", resetCrono);
+document.addEventListener("visibilitychange", () => paintCrono());
+window.addEventListener("pageshow", () => paintCrono());
+window.addEventListener("focus", () => paintCrono());
 
+restoreCrono();
 restorePrefs();
 render();
 loadNotes().then(() => render()).catch((err) => flashSaved(err.message || "Note non caricate"));
