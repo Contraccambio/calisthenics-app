@@ -42,7 +42,7 @@ export const ROUTINE = {
       { id: "d3-bl", name: "Back lever", rest: "2'", restSec: 120, targets: { w12: "3x max", w34: "4x max", w56: "4x max" } },
       { id: "d3-hs", name: "Handstand", rest: "1'30\"", restSec: 90, targets: { w12: "Come Giorno 2", w34: "Come Giorno 2", w56: "Come Giorno 2" }, note: "Stesse propedeutiche personali del Giorno 2." },
       { id: "d3-lsit", name: "L-sit", rest: "1'30\"", restSec: 90, targets: { w12: "3x10\"", w34: "3x12\"", w56: "4x12\"" } },
-      { id: "d3-ladder", name: "Pull ups / Dips (ladder)", rest: "Reg.", restSec: 0, targets: { w12: "5/1 · 4/2 · 3/3 · 2/4 · 1/5", w34: "6/1 · 5/2 · 4/3 · 3/4 · 2/5 · 1/6", w56: "7/1 · 6/2 · 5/3 · 4/4 · 3/5 · 2/6 · 1/7" } },
+      { id: "d3-ladder", name: "Pull ups / Dips (pyramid)", rest: "Reg.", restSec: 0, targets: { w12: "5/1 · 4/2 · 3/3 · 2/4 · 1/5", w34: "6/1 · 5/2 · 4/3 · 3/4 · 2/5 · 1/6", w56: "7/1 · 6/2 · 5/3 · 4/4 · 3/5 · 2/6 · 1/7" } },
       { id: "d3-wheel", name: "Ab wheel", rest: "1'", restSec: 60, targets: { w12: "3x8", w34: "3x10", w56: "3x12" } }
     ]
   }
