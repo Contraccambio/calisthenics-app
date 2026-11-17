@@ -48,16 +48,52 @@ export const ROUTINE = {
   }
 };
 
+const NEXT = {
+  1: {
+    title: "Pull + Skills",
+    focus: "Trazioni, dips, gambe, front lever, planche",
+    exercises: [
+      { id: "n1-pullups", name: "Pull ups", rest: "3'", restSec: 180, targets: { w78: "4-4-3-3", w910: "4-3-3-2", w11: "4-3-3-2-2", s12: "Test massimale" } },
+      { id: "n1-dips", name: "Dips", rest: "30\"", restSec: 30, targets: { w78: "Ladder 1-3-5-7-5", w910: "Ladder 1-3-5-7-5-3", w11: "Ladder 1-3-5-7-5-3-1", s12: "Ladder 1-3-5-7-5-3-1" } },
+      { id: "n1-goblet", name: "Goblet squat", rest: "1'30\" / 2'", restSec: 90, targets: { w78: "12-10-8", w910: "10-8-6", w11: "8-6-6", s12: "8-6-6" } },
+      { id: "n1-affondi", name: "Affondi statici KB", rest: "—", restSec: 0, targets: { w78: "3x10 / lato", w910: "3x10 / lato", w11: "3x10 / lato", s12: "3x10 / lato" } },
+      { id: "n1-fl", name: "Front lever", rest: "2'", restSec: 120, targets: { w78: "4x max", w910: "4x max", w11: "4x max", s12: "4x max" }, skill: true, section: "Skills" },
+      { id: "n1-icm", name: "Ice cream maker", rest: "1'30\" / 2'", restSec: 90, targets: { w78: "3x3", w910: "3x4", w11: "4x4", s12: "4x4" }, skill: true },
+      { id: "n1-bap", name: "Bent arm planche", rest: "2'", restSec: 120, targets: { w78: "3x max", w910: "3x max", w11: "3x max", s12: "3x max" }, skill: true },
+      { id: "n1-chin", name: "Chin ups", rest: "EMOM", restSec: 60, targets: { w78: "EMOM 5'", w910: "EMOM 6'", w11: "EMOM 7'", s12: "EMOM 7'" } },
+      { id: "n1-archer", name: "Archer push ups", rest: "1'30\"", restSec: 90, targets: { w78: "3x4", w910: "4x4", w11: "4x5", s12: "4x5" } },
+      { id: "n1-lr", name: "Leg raises", rest: "1'30\"", restSec: 90, targets: { w78: "4x10", w910: "4x10", w11: "4x10", s12: "4x10" } },
+      { id: "n1-hollow", name: "Hollow body", rest: "1'", restSec: 60, targets: { w78: "3x max", w910: "3x max", w11: "3x max", s12: "3x max" } }
+    ]
+  }
+};
+
+const BLOCKS = {
+  a: ROUTINE,
+  b: NEXT,
+};
+
 export const WEEKS = [
-  { id: "w12", label: "Settimane 1–2" },
-  { id: "w34", label: "Settimane 3–4" },
-  { id: "w56", label: "Settimane 5–6" }
+  { id: "w12", label: "Settimane 1–2", block: "a" },
+  { id: "w34", label: "Settimane 3–4", block: "a" },
+  { id: "w56", label: "Settimane 5–6", block: "a" },
+  { id: "w78", label: "Settimane 7–8", block: "b" },
+  { id: "w910", label: "Settimane 9–10", block: "b" },
+  { id: "w11", label: "Settimana 11", block: "b" },
+  { id: "s12", label: "Settimana 12", block: "b" }
 ];
 
+export function routineForWeek(weekId) {
+  const week = WEEKS.find((w) => w.id === weekId);
+  return BLOCKS[week?.block || "a"];
+}
+
 export function findExercise(exerciseId) {
-  for (const day of Object.values(ROUTINE)) {
-    const found = day.exercises.find((ex) => ex.id === exerciseId);
-    if (found) return found;
+  for (const days of Object.values(BLOCKS)) {
+    for (const day of Object.values(days)) {
+      const found = day.exercises.find((ex) => ex.id === exerciseId);
+      if (found) return found;
+    }
   }
   return null;
 }

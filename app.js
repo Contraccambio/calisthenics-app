@@ -1,4 +1,4 @@
-import { ROUTINE, WEEKS, findExercise } from "./data.js";
+import { WEEKS, findExercise, routineForWeek } from "./data.js";
 
 const PREFS_KEY = "calisthenics-prefs";
 const CRONO_KEY = "calisthenics-crono";
@@ -44,8 +44,8 @@ function persistPrefs() {
 function restorePrefs() {
   try {
     const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) || "null");
+    if (prefs?.week && WEEKS.some((w) => w.id === prefs.week)) state.week = prefs.week;
     if (prefs?.day) state.day = Number(prefs.day);
-    if (prefs?.week) state.week = prefs.week;
   } catch {
     /* ignore */
   }
@@ -165,8 +165,14 @@ function startTimerForExercise(exerciseId) {
   else startCronoFresh(ex.name);
 }
 
+function activeRoutine() {
+  const routine = routineForWeek(state.week);
+  if (!routine[state.day]) state.day = Number(Object.keys(routine)[0]);
+  return routine;
+}
+
 async function completeSession() {
-  const exerciseIds = ROUTINE[state.day].exercises.map((ex) => ex.id);
+  const exerciseIds = activeRoutine()[state.day].exercises.map((ex) => ex.id);
   try {
     await api("/api/sessions/complete", {
       method: "POST",
@@ -366,7 +372,7 @@ function weekLabel(id) {
 }
 
 function progress() {
-  const day = ROUTINE[state.day];
+  const day = activeRoutine()[state.day];
   const done = day.exercises.filter((ex) => {
     const n = noteForToday(ex.id);
     return n && (n.done || (n.text || "").trim());
@@ -381,15 +387,16 @@ function csvEscape(value) {
 }
 
 function sessionRows(session) {
+  const day = routineForWeek(session.week)[session.day];
   const rows = [
     ["Data allenamento", session.date],
-    ["Giorno", `Giorno ${session.day} — ${ROUTINE[session.day]?.title || ""}`],
+    ["Giorno", `Giorno ${session.day} — ${day?.title || ""}`],
     ["Periodo", weekLabel(session.week)],
     [],
     ["Esercizio", "Target", "Recupero", "Fatto", "Note"],
   ];
   const byId = Object.fromEntries((session.notes || []).map((n) => [n.exerciseId, n]));
-  (ROUTINE[session.day]?.exercises || []).forEach((ex) => {
+  (day?.exercises || []).forEach((ex) => {
     const n = byId[ex.id];
     rows.push([ex.name, ex.targets[session.week] || "", ex.rest, n?.done ? "Sì" : "", (n?.text || "").trim() || "-"]);
   });
@@ -459,7 +466,9 @@ function render() {
 }
 
 function renderWorkout() {
-  const day = ROUTINE[state.day];
+  const routine = activeRoutine();
+  const day = routine[state.day];
+  const days = Object.keys(routine).map(Number).sort((a, b) => a - b);
   const { done, total } = progress();
   return `
     <div class="topbar">
@@ -472,11 +481,11 @@ function renderWorkout() {
       <p>${day.focus}</p>
       <div class="progress">${done}/${total} esercizi annotati</div>
     </section>
-    <div class="segment">
-      ${[1, 2, 3].map((d) => `
+    <div class="segment" style="grid-template-columns: repeat(${days.length}, 1fr)">
+      ${days.map((d) => `
         <button class="seg ${state.day === d ? "active" : ""}" data-day="${d}">
           <b>Giorno ${d}</b>
-          <span>${ROUTINE[d].title}</span>
+          <span>${routine[d].title}</span>
         </button>
       `).join("")}
     </div>
@@ -492,7 +501,7 @@ function renderWorkout() {
         <input type="date" id="dateInput" value="${state.date}" />
       </div>
     </div>
-    ${day.exercises.map((ex) => renderExercise(ex)).join("")}
+    ${renderExerciseList(day.exercises)}
     <div class="footer-actions">
       <button class="btn btn-primary btn-block" id="completeBtn">Completa sessione</button>
       <div class="row">
@@ -501,6 +510,17 @@ function renderWorkout() {
       </div>
     </div>
   `;
+}
+
+function renderExerciseList(exercises) {
+  let lastSection = "";
+  return exercises.map((ex) => {
+    const label = ex.section && ex.section !== lastSection
+      ? `<div class="section-label">${escapeHtml(ex.section)}</div>`
+      : "";
+    if (ex.section) lastSection = ex.section;
+    return label + renderExercise(ex);
+  }).join("");
 }
 
 function renderExercise(ex) {
@@ -552,7 +572,7 @@ function renderHistory() {
           <button class="card session-card" data-open-session="${s.date}|${s.day}">
             <div>
               <div class="ex-name">${formatDate(s.date)} · Giorno ${s.day}</div>
-              <div class="muted">${ROUTINE[s.day]?.title || ""} · ${weekLabel(s.week)}</div>
+              <div class="muted">${routineForWeek(s.week)[s.day]?.title || ""} · ${weekLabel(s.week)}</div>
             </div>
             <div class="muted">${s.notes.filter((n) => (n.text || "").trim()).length} note${s.completedAt ? " · completata" : ""}</div>
           </button>
@@ -586,6 +606,7 @@ function bindEvents() {
   });
   document.getElementById("weekSelect")?.addEventListener("change", (e) => {
     state.week = e.target.value;
+    activeRoutine();
     persistPrefs();
     render();
   });
