@@ -65,6 +65,23 @@ const NEXT = {
       { id: "n1-lr", name: "Leg raises", rest: "1'30\"", restSec: 90, targets: { w78: "4x10", w910: "4x10", w11: "4x10", s12: "4x10" } },
       { id: "n1-hollow", name: "Hollow body", rest: "1'", restSec: 60, targets: { w78: "3x max", w910: "3x max", w11: "3x max", s12: "3x max" } }
     ]
+  },
+  2: {
+    title: "Chin + Skills",
+    focus: "Chin zavorrate, bar dips, lever, handstand",
+    exercises: [
+      { id: "n2-chin", name: "Chin ups alla fronte zavorrate", rest: "2'", restSec: 120, targets: { w78: "4x5", w910: "5x5", w11: "5x4", s12: "5x4" } },
+      { id: "n2-bardips", name: "Bar dips", rest: "2'", restSec: 120, targets: { w78: "4x6", w910: "4x5", w11: "5x4", s12: "5x4" } },
+      { id: "n2-combo", name: "Combo front lever to back", rest: "2'", restSec: 120, targets: { w78: "3x1", w910: "4x1", w11: "5x1", s12: "5x1" }, skill: true, section: "Skills" },
+      { id: "n2-hs", name: "Handstand work", rest: "1'30\"", restSec: 90, targets: { w78: "Compressioni 2x10 / lato · plank to pike 3x3–4 · wall walk iso 3x20\" · verticale libera 3–4 volte", w910: "Compressioni 2x10 / lato · plank to pike 3x3–4 · wall walk iso 3x20\" · verticale libera 3–4 volte", w11: "Compressioni 2x10 / lato · plank to pike 3x3–4 · wall walk iso 3x20\" · verticale libera 3–4 volte", s12: "Compressioni 2x10 / lato · plank to pike 3x3–4 · wall walk iso 3x20\" · verticale libera 3–4 volte" }, skill: true, note: "Pausa 45\" nel wall walk. Verticale vicino al muro oppure libera assistita." },
+      { id: "n2-rdl", name: "RDL KB", rest: "1'30\"", restSec: 90, targets: { w78: "3x10", w910: "4x10", w11: "4x8", s12: "4x8" } },
+      { id: "n2-hip", name: "Hip thrust", rest: "1'30\"", restSec: 90, targets: { w78: "15-12-10", w910: "12-10-8", w11: "10-8-6", s12: "10-8-6" } },
+      { id: "n2-tpull", name: "T-pull ups", rest: "2'", restSec: 120, targets: { w78: "3x1 / lato", w910: "3x2 / lato", w11: "4x2 / lato", s12: "4x2 / lato" } },
+      { id: "n2-push", name: "Push ups zavorrate", rest: "EMOM", restSec: 60, targets: { w78: "5 min: 8 reps", w910: "6 min: 8 reps", w11: "6 min: 6 reps", s12: "6 min: 6 reps" } },
+      { id: "n2-aus", name: "Australian alla sbarra", rest: "—", restSec: 0, targets: { w78: "50 in 5'", w910: "55 in 5'", w11: "60 in 5'", s12: "60 in 5'" } },
+      { id: "n2-df", name: "Dragon flag + 1 negativa", rest: "1'30\"", restSec: 90, targets: { w78: "3x10\"", w910: "3x15\"", w11: "4x15\"", s12: "4x15\"" } },
+      { id: "n2-abs", name: "Addominali alle parallele", rest: "1'30\"", restSec: 90, targets: { w78: "3x10", w910: "3x10", w11: "3x10", s12: "3x10" } }
+    ]
   }
 };
 
